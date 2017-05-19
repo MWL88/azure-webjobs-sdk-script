@@ -203,6 +203,9 @@ namespace Microsoft.Azure.WebJobs.Script
                     currentErrorBuilder.Append(".");
                 }
 
+                AddFusionInfoToMessage(ex, ref currentErrorBuilder);
+                AddLoadTypeInfoToMessage(ex, ref currentErrorBuilder);
+
                 // sometimes inner exceptions are exactly the same
                 // so first check before duplicating
                 string currentError = currentErrorBuilder.ToString();
@@ -221,6 +224,59 @@ namespace Microsoft.Azure.WebJobs.Script
             while ((ex = ex.InnerException) != null);
 
             return flattenedErrorsBuilder.ToString();
+
+            void AddFusionInfoToMessage(Exception currentException, ref StringBuilder msgBuilder)
+            {
+                string fusionLog = null;
+                string filename = null;
+                if (currentException is System.IO.FileLoadException)
+                {
+                    fusionLog = ((System.IO.FileLoadException)currentException).FusionLog;
+                    filename = ((System.IO.FileLoadException)currentException).FileName;
+                }
+
+                if (currentException is System.IO.FileNotFoundException)
+                {
+                    fusionLog = ((System.IO.FileNotFoundException)currentException).FusionLog;
+                    filename = ((System.IO.FileNotFoundException)currentException).FileName;
+                }
+
+                if (currentException is System.BadImageFormatException)
+                {
+                    fusionLog = ((System.BadImageFormatException)currentException).FusionLog;
+                    filename = ((System.BadImageFormatException)currentException).FileName;
+                }
+
+                if (string.IsNullOrEmpty(filename) == false)
+                {
+                    string period = filename.EndsWith(".") ? string.Empty : ".";
+                    msgBuilder.AppendFormat(" Filename: {0}{1}", filename, period);
+                }
+
+                if (string.IsNullOrEmpty(fusionLog) == false)
+                {
+                    string period = fusionLog.EndsWith(".") ? string.Empty : ".";
+                    msgBuilder.AppendFormat(" FusionLog: {0}{1}", fusionLog, period);
+                }
+            }
+
+            void AddLoadTypeInfoToMessage(Exception currentException, ref StringBuilder msgBuilder)
+            {
+                if (currentException is System.Reflection.ReflectionTypeLoadException)
+                {
+                    System.Reflection.ReflectionTypeLoadException reflectionTypeLoadException = currentException as System.Reflection.ReflectionTypeLoadException;
+                    if (reflectionTypeLoadException.LoaderExceptions != null)
+                    {
+                        for (int idx = 0; idx < reflectionTypeLoadException.LoaderExceptions.Length; ++idx)
+                        {
+                            Exception loaderException = reflectionTypeLoadException.LoaderExceptions[0];
+                            string msg = FlattenException(loaderException, sourceFormatter, includeSource);
+                            string period = msg.EndsWith(".") ? string.Empty : ".";
+                            msgBuilder.AppendFormat(" LoaderException {2}: {3}: {0}{1}", msg, period, idx + 1, loaderException.GetType().Name);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>

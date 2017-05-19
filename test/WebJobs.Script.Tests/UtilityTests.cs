@@ -184,6 +184,67 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         }
 
         [Fact]
+        public void FlattenException_LoadFailure_FileLoadException_ReturnsExpectedResult()
+        {
+            // Exception System.IO.FileLoadException has useful information in the FusionLog member
+
+            Type[] constructorParameterTypes = { typeof(string), typeof(string), typeof(int) };
+            ConstructorInfo cc = typeof(System.IO.FileLoadException).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, constructorParameterTypes, null);
+
+            object[] constructorParameters = { "filename", "fusionlog", 10 };
+            object o = cc.Invoke(constructorParameters);
+            System.IO.FileLoadException testFileLoadException = o as System.IO.FileLoadException;
+
+            string formattedResult = Utility.FlattenException(testFileLoadException);
+            Assert.Contains("Filename: filename. FusionLog: fusionlog.", formattedResult);
+        }
+
+        [Fact]
+        public void FlattenException_LoadFailure_FileNotFoundException_ReturnsExpectedResult()
+        {
+            // Exception System.IO.FileNotFoundException has useful information in the FusionLog member
+
+            Type[] constructorParameterTypes = { typeof(string), typeof(string), typeof(int) };
+            ConstructorInfo cc = typeof(System.IO.FileNotFoundException).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, constructorParameterTypes, null);
+
+            object[] constructorParameters = { "filename", "fusionlog", 10 };
+            object o = cc.Invoke(constructorParameters);
+            System.IO.FileNotFoundException testException = o as System.IO.FileNotFoundException;
+
+            string formattedResult = Utility.FlattenException(testException);
+            Assert.Contains("Filename: filename. FusionLog: fusionlog.", formattedResult);
+        }
+
+        [Fact]
+        public void FlattenException_LoadFailure_BadImageFormatException_ReturnsExpectedResult()
+        {
+            // Exception System.BadImageFormatException has useful information in the FusionLog member
+
+            Type[] constructorParameterTypes = { typeof(string), typeof(string), typeof(int) };
+            ConstructorInfo cc = typeof(System.BadImageFormatException).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, constructorParameterTypes, null);
+
+            object[] constructorParameters = { "filename", "fusionlog", 10 };
+            object o = cc.Invoke(constructorParameters);
+            System.BadImageFormatException testException = o as System.BadImageFormatException;
+
+            string formattedResult = Utility.FlattenException(testException);
+            Assert.Contains("Filename: filename. FusionLog: fusionlog.", formattedResult);
+        }
+
+        [Fact]
+        public void FlattenException_LoadFailure_ReflectionTypeLoadException_ReturnsExpectedResult()
+        {
+            // Exception System.Reflection.ReflectionTypeLoadException has useful information in the LoaderExceptions member
+
+            Type[] classes = { typeof(string) };
+            Exception[] exceptions = { new System.IO.FileNotFoundException("message", "filename") };
+            System.Reflection.ReflectionTypeLoadException testException = new ReflectionTypeLoadException(classes, exceptions);
+
+            string formattedResult = Utility.FlattenException(testException);
+            Assert.Equal("Exception of type 'System.Reflection.ReflectionTypeLoadException' was thrown. LoaderException 1: FileNotFoundException: message. Filename: filename.", formattedResult);
+        }
+
+        [Fact]
         public void FlattenException_AggregateException_ReturnsExpectedResult()
         {
             ApplicationException ex1 = new ApplicationException("Incorrectly configured setting 'Foo'");
