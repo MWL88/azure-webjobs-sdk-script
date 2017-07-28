@@ -182,7 +182,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
             string invocationId = context.ExecutionContext.InvocationId.ToString();
             DataType dataType = _trigger.DataType ?? DataType.String;
 
-            var userTraceWriter = CreateUserTraceWriter(context.TraceWriter);
+            var userTraceWriter = context.TraceWriter;
             var scriptExecutionContext = await CreateScriptExecutionContextAsync(input, dataType, userTraceWriter, context).ConfigureAwait(false);
             var bindingData = (Dictionary<string, object>)scriptExecutionContext["bindingData"];
 
@@ -705,7 +705,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
         /// <summary>
         /// Performs required static initialization in the Edge context.
         /// </summary>
-        private static async Task InitializeAsync()
+        internal static async Task InitializeAsync()
         {
             var handle = (ScriptFunc)(err =>
             {

@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -132,6 +133,7 @@ namespace Microsoft.Azure.WebJobs.Script
             return data.ToDictionary(p => p.Key, p => p.Value != null ? p.Value.ToString() : null, StringComparer.OrdinalIgnoreCase);
         }
 
+        // "Namespace.Class.Method" --> "Method"
         public static string GetFunctionShortName(string functionName)
         {
             int idx = functionName.LastIndexOf('.');
@@ -141,6 +143,14 @@ namespace Microsoft.Azure.WebJobs.Script
             }
 
             return functionName;
+        }
+
+        // "Namespace.Class.Method" --> "Namespace.Class"
+        public static string GetFullClassName(string fullFunctionName)
+        {
+            int i = fullFunctionName.LastIndexOf('.');
+            var typeName = fullFunctionName.Substring(0, i);
+            return typeName;
         }
 
         internal static string GetDefaultHostId(ScriptSettingsManager settingsManager, ScriptHostConfiguration scriptConfig)
@@ -401,6 +411,11 @@ namespace Microsoft.Azure.WebJobs.Script
             }
 
             return false;
+        }
+
+        public static IJobHostMetadataProvider CreateMetadataProvider(this JobHost host)
+        {
+            return (IJobHostMetadataProvider)host.Services.GetService(typeof(IJobHostMetadataProvider));
         }
 
         internal static bool IsNullable(Type type)

@@ -16,6 +16,7 @@ using System.Threading.Tasks.Dataflow;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
+using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Binding;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Description;
@@ -59,7 +60,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             var traceWriter = new TestTraceWriter(TraceLevel.Verbose);
             var functionErrors = new Dictionary<string, Collection<string>>();
             var metadata = ScriptHost.ReadFunctionMetadata(config, traceWriter, null, functionErrors);
-            Assert.Equal(50, metadata.Count);
+            Assert.Equal(51, metadata.Count);
         }
 
         [Fact]
@@ -382,6 +383,42 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             Assert.Equal("Invalid property identifier character: ~. Path '', line 2, position 4.", ex.InnerException.Message);
         }
 
+        [Fact]
+        public void Create_HostJsonValueError_LogsError()
+        {
+            // Try to load valid host.json file that has an out-of-range value.
+            // Ensure that it's logged to TraceWriter and ILogger
+
+            var traceWriter = new TestTraceWriter(TraceLevel.Verbose);
+            string rootPath = Path.Combine(Environment.CurrentDirectory, @"TestScripts\OutOfRange");
+
+            ScriptHostConfiguration scriptConfig = new ScriptHostConfiguration()
+            {
+                RootScriptPath = rootPath,
+                TraceWriter = traceWriter
+            };
+
+            TestLoggerProvider provider = new TestLoggerProvider();
+            scriptConfig.HostConfig.AddService<ILoggerFactoryBuilder>(new TestLoggerFactoryBuilder(provider));
+
+            var environment = new Mock<IScriptHostEnvironment>();
+            var eventManager = new Mock<IScriptEventManager>();
+
+            var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            {
+                ScriptHost.Create(environment.Object, eventManager.Object, scriptConfig, _settingsManager);
+            });
+
+            string msg = "ScriptHost initialization failed";
+            var trace = traceWriter.Traces.Single(t => t.Level == TraceLevel.Error);
+            Assert.Equal(msg, trace.Message);
+            Assert.Same(ex, trace.Exception);
+
+            var loggerMessage = provider.CreatedLoggers.Single().LogMessages.Single();
+            Assert.Equal(msg, loggerMessage.FormattedMessage);
+            Assert.Same(ex, loggerMessage.Exception);
+        }
+
         [Theory]
         [InlineData("host")]
         [InlineData("-function")]
@@ -451,7 +488,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             scriptConfig.HostConfig.HostConfigMetadata = config;
             TraceWriter traceWriter = new TestTraceWriter(TraceLevel.Verbose);
 
-            scriptConfig.HostConfig.CreateMetadataProvider(); // will cause extensions to initialize and consume config metadata.
+            new JobHost(scriptConfig.HostConfig).CreateMetadataProvider(); // will cause extensions to initialize and consume config metadata.
 
             Assert.Equal(60 * 1000, scriptConfig.HostConfig.Queues.MaxPollingInterval.TotalMilliseconds);
             Assert.Equal(16, scriptConfig.HostConfig.Queues.BatchSize);
@@ -467,7 +504,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             scriptConfig = new ScriptHostConfiguration();
             scriptConfig.HostConfig.HostConfigMetadata = config;
-            scriptConfig.HostConfig.CreateMetadataProvider(); // will cause extensions to initialize and consume config metadata.
+            new JobHost(scriptConfig.HostConfig).CreateMetadataProvider(); // will cause extensions to initialize and consume config metadata.
 
             Assert.Equal(5000, scriptConfig.HostConfig.Queues.MaxPollingInterval.TotalMilliseconds);
             Assert.Equal(17, scriptConfig.HostConfig.Queues.BatchSize);
@@ -1474,6 +1511,21 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             public void Dispose()
             {
+            }
+        }
+
+        private class TestLoggerFactoryBuilder : ILoggerFactoryBuilder
+        {
+            private TestLoggerProvider _provider;
+
+            public TestLoggerFactoryBuilder(TestLoggerProvider provider)
+            {
+                _provider = provider;
+            }
+
+            public void AddLoggerProviders(ILoggerFactory factory, ScriptHostConfiguration scriptConfig, ScriptSettingsManager settingsManager)
+            {
+                factory.AddProvider(_provider);
             }
         }
     }
